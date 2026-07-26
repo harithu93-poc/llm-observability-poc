@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Observability POC — Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E11;
+    --panel: #12161B;
+    --panel-hi: #171C22;
+    --border: #232830;
+    --text: #E8E6E1;
+    --muted: #8A8F98;
+    --amber: #FFB000;
+    --cyan: #5EC8D8;
+    --red: #FF5D5D;
+    --green: #6FCF97;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.5;
+    padding: 0;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  code, .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* ---- Boot log hero ---- */
+  .boot {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px 28px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 40px;
+  }
+  .boot .line { margin-bottom: 4px; }
+  .boot .ok { color: var(--green); }
+  .boot .prompt { color: var(--amber); }
+  .boot .cursor {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: var(--amber);
+    margin-left: 4px;
+    animation: blink 1.1s step-end infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .subtitle { color: var(--muted); font-size: 15px; margin-bottom: 40px; }
+  .subtitle .amber { color: var(--amber); }
+
+  h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 48px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2::before { content: ''; width: 3px; height: 14px; background: var(--amber); display: inline-block; }
+
+  /* ---- Architecture pipeline ---- */
+  .pipeline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    color: var(--muted);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .pipeline .node { color: var(--text); }
+  .pipeline .arrow { color: var(--amber); }
+
+  /* ---- Stat cards ---- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 22px;
+  }
+  .card .model-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .card.llama .model-name { color: var(--amber); }
+  .card.phi .model-name { color: var(--cyan); }
+  .card .model-sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--border); }
+  .stat-row:first-of-type { border-top: none; }
+  .stat-label { color: var(--muted); font-size: 13px; }
+  .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; }
+
+  .bar-track { height: 6px; background: var(--border); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .llama .bar-fill { background: var(--amber); }
+  .phi .bar-fill { background: var(--cyan); }
+
+  /* ---- Finding callout ---- */
+  .finding {
+    background: var(--panel-hi);
+    border: 1px solid var(--amber);
+    border-left: 3px solid var(--amber);
+    border-radius: 4px;
+    padding: 20px 24px;
+    margin-top: 16px;
+  }
+  .finding .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .finding p { color: var(--text); font-size: 14px; }
+  .finding .num { font-family: 'IBM Plex Mono', monospace; color: var(--amber); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td.mono { font-family: 'IBM Plex Mono', monospace; }
+  td.placeholder { color: var(--muted); font-style: italic; }
+
+  ul.next { list-style: none; }
+  ul.next li { padding: 8px 0 8px 20px; position: relative; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+  ul.next li:first-child { border-top: none; }
+  ul.next li::before { content: '→'; position: absolute; left: 0; color: var(--amber); }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="boot">
+    <div class="line"><span class="prompt">$</span> platform status --project llm-observability-poc</div>
+    <div class="line ok">✓ ollama          native · wsl2 · llama3.2 + phi4</div>
+    <div class="line ok">✓ fastapi-wrapper  docker · :8000</div>
+    <div class="line ok">✓ elasticsearch    9.4.4 · single-node</div>
+    <div class="line ok">✓ logstash         tailing app.log → es</div>
+    <div class="line ok">✓ kibana           dashboards + alerting rule active</div>
+    <div class="line">host: Dell Precision 5540 · i7-9850H · 64GB RAM · Quadro T1000 4GB<span class="cursor"></span></div>
+  </div>
+
+  <h1>Self-Hosted LLM Serving — Comparison Report</h1>
+  <p class="subtitle">Ollama + FastAPI wrapper, instrumented with the ELK stack. Two models, one <span class="amber">GPU-constrained</span> reality.</p>
+
+  <h2>Architecture</h2>
+  <div class="pipeline">k6 load test  <span class="arrow">──▶</span>  <span class="node">FastAPI wrapper</span> (docker)  <span class="arrow">──▶</span>  <span class="node">Ollama</span> (native, wsl2)
+                              │
+                              <span class="arrow">▼</span>
+                        app.log (json)
+                              │
+                              <span class="arrow">▼</span>
+                        <span class="node">Logstash</span>  <span class="arrow">──▶</span>  <span class="node">Elasticsearch</span>  <span class="arrow">──▶</span>  <span class="node">Kibana</span> (dashboards + alerts)</div>
+
+  <h2>Model comparison</h2>
+  <div class="grid">
+    <div class="card llama">
+      <div class="model-name">Llama 3.2</div>
+      <div class="model-sub">3B params · Meta · lightweight / on-device</div>
+
+      <div class="stat-row"><span class="stat-label">p95 latency</span><span class="stat-value" id="llama-p95">— run get-stats.sh —</span></div>
+      <div class="stat-row"><span class="stat-label">avg tokens/sec</span><span class="stat-value" id="llama-tps">— run get-stats.sh —</span></div>
+      <div class="stat-row"><span class="stat-label">requests served</span><span class="stat-value" id="llama-count">— run get-stats.sh —</span></div>
+      <div class="stat-row"><span class="stat-label">error rate</span><span class="stat-value" id="llama-err">— run get-stats.sh —</span></div>
+    </div>
+
+    <div class="card phi">
+      <div class="model-name">Phi-4</div>
+      <div class="model-sub">14B params · Microsoft · reasoning-optimized</div>
+
+      <div class="stat-row"><span class="stat-label">p95 latency</span><span class="stat-value">27,795 ms</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div>
+
+      <div class="stat-row"><span class="stat-label">avg tokens/sec</span><span class="stat-value">3.4</span></div>
+      <div class="stat-row"><span class="stat-label">requests served</span><span class="stat-value" id="phi-count">— run get-stats.sh —</span></div>
+      <div class="stat-row"><span class="stat-label">error rate</span><span class="stat-value" id="phi-err">— run get-stats.sh —</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="tag">Key finding</div>
+    <p>A single Phi-4 (14B) request measured <span class="num">27.8s</span> at only <span class="num">3.4 tok/s</span> — the 4GB VRAM Quadro T1000 can't fit the model, so Ollama falls back to CPU. Llama 3.2 (3B) fits comfortably and stays GPU-accelerated. This is the real finding: <strong>most self-hosted LLM deployments are hardware-constrained</strong>, not just "bigger model = slower."</p>
+  </div>
+
+  <h2>Full stats table</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Llama 3.2</th><th>Phi-4</th></tr></thead>
+    <tbody>
+      <tr><td>Requests served</td><td class="mono placeholder">run get-stats.sh</td><td class="mono placeholder">run get-stats.sh</td></tr>
+      <tr><td>p50 latency</td><td class="mono placeholder">run get-stats.sh</td><td class="mono placeholder">run get-stats.sh</td></tr>
+      <tr><td>p95 latency</td><td class="mono placeholder">run get-stats.sh</td><td class="mono">27,795 ms</td></tr>
+      <tr><td>Avg tokens/sec</td><td class="mono placeholder">run get-stats.sh</td><td class="mono">3.4</td></tr>
+      <tr><td>Error rate</td><td class="mono placeholder">run get-stats.sh</td><td class="mono placeholder">run get-stats.sh</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Next steps</h2>
+  <ul class="next">
+    <li>RAG integration — /rag-chat endpoint with the same observability logging</li>
+    <li>OpenTelemetry tracing → Elastic APM for full request tracing</li>
+    <li>Kubernetes deployment (kind/minikube + Helm) in place of docker-compose</li>
+    <li>Model-size-matched comparison — phi4-mini (3.8B) vs Llama 3.2 for a cleaner benchmark</li>
+  </ul>
+
+  <footer>llm-observability-poc · generated report · replace placeholder values via scripts/get-stats.sh</footer>
+
+</div>
+</body>
+</html>
