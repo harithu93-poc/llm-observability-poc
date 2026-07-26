@@ -29,13 +29,12 @@ jobs:
       - name: Run tests
         run: pytest tests -v
 
-  # Activates once app/Dockerfile exists (Week 1, Day 4) — builds the image
-  # to confirm it compiles cleanly. Push-to-registry can be added later if
-  # you want this deployed anywhere beyond local docker-compose.
-  # docker-build:
-  #   runs-on: ubuntu-latest
-  #   needs: lint-and-test
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Build image
-  #       run: docker build -t llm-observability-poc:ci -f app/Dockerfile app
+  # Builds the image to confirm it compiles cleanly. Push-to-registry can be
+  # added later if you want this deployed anywhere beyond local docker-compose.
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t llm-observability-poc:ci -f app/Dockerfile app
