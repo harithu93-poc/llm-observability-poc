@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+
+# Logs — runtime output, not source
+app/logs/
+*.log
+
+# Env files
+.env
+
+# OS
+.DS_Store
+
+# Elasticsearch/Docker volumes (added ahead of Week 2)
+esdata/
